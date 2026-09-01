@@ -120,21 +120,34 @@ work in production exactly as they do locally.
 
 Import the repo into Vercel once. It should detect the `services` config
 in `vercel.json` and configure both pieces automatically — no per-service
-Root Directory or Framework Preset picking needed. Set these environment
-variables on the project:
+Root Directory or Framework Preset picking needed.
 
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | A Postgres connection string — use your provider's **pooled** connection string (e.g. installing Neon from the Storage tab auto-sets this). Serverless functions can open many concurrent connections, so pooling matters. |
-| `VISION_PROVIDER` | `anthropic` — Ollama can't run on Vercel |
-| `ANTHROPIC_API_KEY` | Your Anthropic API key |
+### Env vars: only one is actually required
 
-That's it — three variables. The read-only food/nutrient search data
-(`FOOD_DB_PATH`) auto-resolves to the bundled `backend/data/food_reference.db`
-whenever `DATABASE_URL` is set, so it doesn't need its own variable. The
-write-tables (profile, logged meals, bodyweight, settings) live in Postgres in
-this mode; the read-only food/nutrient search stays SQLite, opened read-only
-from the bundled file — no code path writes to it.
+Vercel sets a `VERCEL` variable on every deployment automatically (nothing to
+configure) — the app uses it to auto-detect that it's running there and
+switch defaults accordingly, no env vars needed for that switch itself:
+
+- **`VISION_PROVIDER`** auto-defaults to `anthropic` on Vercel (`ollama`
+  locally) — set it explicitly only to override.
+- **`FOOD_DB_PATH`** auto-resolves to the bundled `backend/data/food_reference.db`
+  on Vercel — never needs setting.
+- **`ANTHROPIC_API_KEY`** is genuinely optional: without it, photo analysis
+  cleanly reports "unavailable, search or scan a barcode instead" instead of
+  erroring — search and barcode scanning work regardless. Set it once you
+  want photo logging to work in production.
+- **`DATABASE_URL`** is the one variable that can't be programmed away — it's
+  a pointer to external infrastructure (your Postgres instance), not a
+  feature toggle. Without it, the app still boots (falls back to ephemeral
+  SQLite in `/tmp`, logged as a warning) rather than crashing, but logged
+  data won't reliably persist between requests. Add a Postgres database
+  (Storage tab → Neon, or your provider of choice) and set this to actually
+  keep your data.
+
+So the honest minimum for a fully working deployment is **one variable**:
+`DATABASE_URL`. Deploy with none set at all and the app still runs — you get
+a working demo with barcode/manual logging and real USDA nutrition data, just
+without photo analysis or durable storage.
 
 ### Why the backend service is rooted at the repo root, not `backend/`
 

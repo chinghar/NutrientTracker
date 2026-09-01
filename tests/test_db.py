@@ -22,17 +22,17 @@ def test_normalize_database_url(raw, expected):
 
 def test_get_food_db_path_defaults_to_app_db_path_locally(monkeypatch):
     monkeypatch.delenv("FOOD_DB_PATH", raising=False)
-    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.setenv("APP_DB_PATH", "/some/path/app.db")
     assert db.get_food_db_path() == "/some/path/app.db"
 
 
-def test_get_food_db_path_defaults_to_bundled_file_in_production(monkeypatch):
-    # DATABASE_URL set (production) with no explicit FOOD_DB_PATH override
-    # should resolve to the bundled reference DB next to backend/db.py,
-    # without needing a second env var configured.
+def test_get_food_db_path_defaults_to_bundled_file_on_vercel(monkeypatch):
+    # Gated on VERCEL, not DATABASE_URL -- food search/barcode lookup must
+    # still work even if Postgres hasn't been connected yet.
     monkeypatch.delenv("FOOD_DB_PATH", raising=False)
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pw@host/db")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("VERCEL", "1")
     assert db.get_food_db_path() == str(db._BUNDLED_FOOD_DB)
     assert db._BUNDLED_FOOD_DB.name == "food_reference.db"
 
@@ -40,6 +40,31 @@ def test_get_food_db_path_defaults_to_bundled_file_in_production(monkeypatch):
 def test_get_food_db_path_override(monkeypatch):
     monkeypatch.setenv("FOOD_DB_PATH", "/bundled/food_reference.db")
     assert db.get_food_db_path() == "/bundled/food_reference.db"
+
+
+# --- get_db_path: forgetting DATABASE_URL on Vercel must not crash the app --
+
+
+def test_get_db_path_local_dev_default(monkeypatch):
+    monkeypatch.delenv("APP_DB_PATH", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    assert db.get_db_path() == "data/app.db"
+
+
+def test_get_db_path_falls_back_to_tmp_on_vercel_without_database_url(monkeypatch):
+    # data/app.db isn't writable on Vercel's read-only deployment filesystem
+    # -- without this fallback, forgetting to set DATABASE_URL would crash
+    # the whole app at startup (SQLModel.metadata.create_all failing to
+    # create the file) rather than just losing persistence.
+    monkeypatch.delenv("APP_DB_PATH", raising=False)
+    monkeypatch.setenv("VERCEL", "1")
+    assert db.get_db_path() == "/tmp/app.db"
+
+
+def test_get_db_path_explicit_override_wins_even_on_vercel(monkeypatch):
+    monkeypatch.setenv("APP_DB_PATH", "/custom/path.db")
+    monkeypatch.setenv("VERCEL", "1")
+    assert db.get_db_path() == "/custom/path.db"
 
 
 def test_get_raw_connection_opens_read_only(tmp_path, monkeypatch):

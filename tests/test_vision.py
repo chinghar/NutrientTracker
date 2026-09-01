@@ -147,13 +147,53 @@ def test_meal_analysis_rejects_extra_top_level_fields():
         )
 
 
-def test_anthropic_provider_requires_api_key_when_no_client_injected(monkeypatch):
+def test_anthropic_provider_construction_never_raises_without_a_key(monkeypatch):
+    # Construction happens during FastAPI dependency resolution, before a
+    # route's own try/except can see it -- raising here would turn a missing
+    # key into a 500 instead of the manual-entry fallback. The check must be
+    # deferred to analyze() instead.
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    AnthropicProvider()  # must not raise
+
+
+def test_anthropic_provider_analyze_raises_cleanly_without_a_key(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    provider = AnthropicProvider()
     with pytest.raises(vision_base.VisionProviderError):
-        AnthropicProvider()
+        provider.analyze(FIXTURE_IMAGE)
 
 
 def test_ollama_provider_wraps_connection_errors(monkeypatch):
     provider = LocalOllamaProvider(host="http://127.0.0.1:1", model="fake-model", timeout=1.0)
     with pytest.raises(vision_base.VisionProviderError):
         provider.analyze(FIXTURE_IMAGE)
+
+
+# --- Provider selection: no VISION_PROVIDER env var should be required ----
+
+
+def test_factory_defaults_to_ollama_locally(monkeypatch):
+    from backend.vision import factory
+
+    monkeypatch.delenv("VISION_PROVIDER", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    provider = factory.get_vision_provider()
+    assert isinstance(provider, LocalOllamaProvider)
+
+
+def test_factory_defaults_to_anthropic_on_vercel(monkeypatch):
+    from backend.vision import factory
+
+    monkeypatch.delenv("VISION_PROVIDER", raising=False)
+    monkeypatch.setenv("VERCEL", "1")
+    provider = factory.get_vision_provider()
+    assert isinstance(provider, AnthropicProvider)
+
+
+def test_factory_explicit_env_var_overrides_the_vercel_default(monkeypatch):
+    from backend.vision import factory
+
+    monkeypatch.setenv("VISION_PROVIDER", "ollama")
+    monkeypatch.setenv("VERCEL", "1")
+    provider = factory.get_vision_provider()
+    assert isinstance(provider, LocalOllamaProvider)

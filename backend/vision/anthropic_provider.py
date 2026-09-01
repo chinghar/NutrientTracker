@@ -27,14 +27,26 @@ def _detect_media_type(image_bytes: bytes) -> str:
 
 class AnthropicProvider(VisionProvider):
     def __init__(self, model: str | None = None, client: "anthropic.Anthropic | None" = None):
-        if client is None and not os.environ.get("ANTHROPIC_API_KEY"):
-            raise VisionProviderError(
-                "ANTHROPIC_API_KEY is not set. Set it in the environment to use AnthropicProvider."
-            )
+        # Deliberately does not check for ANTHROPIC_API_KEY or construct the
+        # client here: this runs during FastAPI dependency resolution, before
+        # a route's own try/except can see it, so raising here would turn a
+        # missing key into a 500 instead of the manual-entry fallback. The
+        # check happens lazily in analyze() instead, which the caller does
+        # wrap in a try/except VisionProviderError.
         self.model = model or os.environ.get("ANTHROPIC_VISION_MODEL", DEFAULT_ANTHROPIC_MODEL)
-        self.client = client if client is not None else anthropic.Anthropic()
+        self._injected_client = client
 
     def analyze(self, image_bytes: bytes, hint: str | None = None) -> MealAnalysis:
+        client = self._injected_client
+        if client is None:
+            if not os.environ.get("ANTHROPIC_API_KEY"):
+                raise VisionProviderError(
+                    "ANTHROPIC_API_KEY is not set. Photo analysis is unavailable until it's configured; "
+                    "search or scan a barcode instead."
+                )
+            client = anthropic.Anthropic()
+        self.client = client
+
         media_type = _detect_media_type(image_bytes)
         image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
         return self._analyze_with_retry(

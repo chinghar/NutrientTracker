@@ -32,23 +32,34 @@ _BUNDLED_FOOD_DB = _BACKEND_DIR / "data" / "food_reference.db"
 
 
 def get_db_path() -> str:
-    return os.environ.get("APP_DB_PATH", "data/app.db")
+    if "APP_DB_PATH" in os.environ:
+        return os.environ["APP_DB_PATH"]
+    if os.environ.get("VERCEL"):
+        # DATABASE_URL wasn't set (get_engine() only reaches this path when
+        # it's absent) and the deployment's own source tree is read-only, so
+        # data/app.db isn't writable there. /tmp is the one writable
+        # location on Vercel -- ephemeral per instance, so data logged this
+        # way won't reliably persist, but at least the app boots and runs
+        # instead of crashing at startup for a forgotten env var.
+        return "/tmp/app.db"
+    return "data/app.db"
 
 
 def get_food_db_path() -> str:
     """Path to the read-only USDA/OFF reference database.
 
-    FOOD_DB_PATH overrides explicitly if set. Otherwise: local dev (no
-    DATABASE_URL) uses the same file as get_db_path(); production
-    (DATABASE_URL set) defaults to the bundled backend/data/food_reference.db
-    shipped alongside this module -- resolved via __file__ rather than a
-    relative string, so it's correct regardless of the deployment's working
-    directory.
+    FOOD_DB_PATH overrides explicitly if set. Otherwise: on Vercel, defaults
+    to the bundled backend/data/food_reference.db shipped alongside this
+    module (resolved via __file__ rather than a relative string, so it's
+    correct regardless of the deployment's working directory) -- gated on
+    VERCEL rather than DATABASE_URL, so food search/barcode lookup still
+    work even if Postgres hasn't been connected yet. Local dev uses the same
+    file as get_db_path().
     """
     override = os.environ.get("FOOD_DB_PATH")
     if override:
         return override
-    if os.environ.get("DATABASE_URL"):
+    if os.environ.get("VERCEL"):
         return str(_BUNDLED_FOOD_DB)
     return get_db_path()
 
@@ -77,6 +88,13 @@ def get_engine():
 
 def init_db() -> None:
     if not os.environ.get("DATABASE_URL"):
+        if os.environ.get("VERCEL"):
+            print(
+                "WARNING: DATABASE_URL is not set. Falling back to SQLite at "
+                f"{get_db_path()}, which does not reliably persist between "
+                "requests on Vercel. Connect a Postgres database and set "
+                "DATABASE_URL for logged data to actually be saved."
+            )
         Path(get_db_path()).parent.mkdir(parents=True, exist_ok=True)
     SQLModel.metadata.create_all(get_engine())
 
