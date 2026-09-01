@@ -27,6 +27,8 @@ from pathlib import Path
 from sqlmodel import Session, SQLModel, create_engine
 
 _engine = None
+_BACKEND_DIR = Path(__file__).resolve().parent
+_BUNDLED_FOOD_DB = _BACKEND_DIR / "data" / "food_reference.db"
 
 
 def get_db_path() -> str:
@@ -34,10 +36,21 @@ def get_db_path() -> str:
 
 
 def get_food_db_path() -> str:
-    """Path to the read-only USDA/OFF reference database. Defaults to the
-    same file as get_db_path() for local dev; set FOOD_DB_PATH to point at
-    the bundled backend/data/food_reference.db in production."""
-    return os.environ.get("FOOD_DB_PATH", get_db_path())
+    """Path to the read-only USDA/OFF reference database.
+
+    FOOD_DB_PATH overrides explicitly if set. Otherwise: local dev (no
+    DATABASE_URL) uses the same file as get_db_path(); production
+    (DATABASE_URL set) defaults to the bundled backend/data/food_reference.db
+    shipped alongside this module -- resolved via __file__ rather than a
+    relative string, so it's correct regardless of the deployment's working
+    directory.
+    """
+    override = os.environ.get("FOOD_DB_PATH")
+    if override:
+        return override
+    if os.environ.get("DATABASE_URL"):
+        return str(_BUNDLED_FOOD_DB)
+    return get_db_path()
 
 
 def _normalize_database_url(url: str) -> str:

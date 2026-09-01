@@ -110,46 +110,44 @@ Vercel Functions have no durable local disk (SQLite writes wouldn't survive
 between requests) and can't run a persistent Ollama process. The app supports
 both modes via environment variables — nothing above changes for local dev.
 
-Deploy as **two separate Vercel projects from the same GitHub repo** (Vercel's
-documented pattern for monorepos):
+Deployment is **one Vercel project** using [Vercel
+Services](https://vercel.com/docs/services): `vercel.json` at the repo root
+declares a `frontend` service (the Vite app) and a `backend` service (FastAPI),
+routed onto one shared domain — `/api/*` goes to the backend, everything else
+to the frontend. Same origin means **no CORS setup and no cross-wiring
+frontend/backend URLs**; the frontend's existing relative `/api/...` calls
+work in production exactly as they do locally.
 
-### 1. Backend project
-
-Leave **Root Directory** as the repo root (not `backend/`) — `backend/food_lookup.py`
-imports from the sibling `scripts/` package, so the whole repo needs to ship
-together. Vercel finds the FastAPI app via `[tool.vercel] entrypoint` in
-`pyproject.toml` and installs from the root `requirements.txt`. Framework
-Preset: **Other** (or whatever Vercel auto-detects for the Python entrypoint —
-there's no dedicated "FastAPI" preset slot).
-
-Environment variables:
+Import the repo into Vercel once. It should detect the `services` config
+in `vercel.json` and configure both pieces automatically — no per-service
+Root Directory or Framework Preset picking needed. Set these environment
+variables on the project:
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | A Postgres connection string (Vercel Postgres, Neon, etc.) — use your provider's **pooled** connection string, since serverless functions can open many concurrent connections |
-| `FOOD_DB_PATH` | `backend/data/food_reference.db` — the bundled read-only USDA reference data (Foundation + SR Legacy, ~13MB, committed to the repo) |
+| `DATABASE_URL` | A Postgres connection string — use your provider's **pooled** connection string (e.g. installing Neon from the Storage tab auto-sets this). Serverless functions can open many concurrent connections, so pooling matters. |
 | `VISION_PROVIDER` | `anthropic` — Ollama can't run on Vercel |
 | `ANTHROPIC_API_KEY` | Your Anthropic API key |
-| `CORS_ORIGINS` | The frontend project's URL, once you have it (see step 3) |
 
-The write-tables (profile, logged meals, bodyweight, settings) live in
-Postgres in this mode; the read-only food/nutrient search stays SQLite,
-opened read-only from the bundled file — no code path writes to it.
+That's it — three variables. The read-only food/nutrient search data
+(`FOOD_DB_PATH`) auto-resolves to the bundled `backend/data/food_reference.db`
+whenever `DATABASE_URL` is set, so it doesn't need its own variable. The
+write-tables (profile, logged meals, bodyweight, settings) live in Postgres in
+this mode; the read-only food/nutrient search stays SQLite, opened read-only
+from the bundled file — no code path writes to it.
 
-### 2. Frontend project
+### Why the backend service is rooted at the repo root, not `backend/`
 
-**Root Directory**: `frontend`. Framework Preset: **Vite** (auto-detected).
-
-Environment variable: `VITE_API_BASE_URL` = the backend project's URL (e.g.
-`https://your-backend.vercel.app`) — leave unset for local dev, where Vite's
-dev-server proxy handles `/api/*` instead.
-
-### 3. Wire them together
-
-The two projects' URLs aren't known until after each first deploy, so:
-deploy both once, then set `VITE_API_BASE_URL` on the frontend project and
-`CORS_ORIGINS` on the backend project to each other's real URLs, and redeploy
-both.
+Vercel Services treat a service's `root` exactly like a standalone project's
+Root Directory — everything outside it is excluded from that service's build.
+The backend's internal code uses absolute imports (`from backend.db import
+...`), which requires `backend/` to still be a real subdirectory relative to
+the service root; scoping the service to `backend/` itself would flatten that
+away and break every internal import. So `vercel.json`'s backend service uses
+`"root": "."` with `"entrypoint": "backend.main:app"` instead — the whole repo
+ships with it (small; no issue for the 500MB Python function limit), while the
+frontend service is still cleanly scoped to `"root": "frontend/"` since Vite
+has no cross-directory dependencies.
 
 ### Other things this required
 
@@ -172,11 +170,12 @@ both.
 ## Project layout
 
 ```
-backend/            FastAPI app (routes/), nutrition math (nutrition/), vision providers (vision/)
+vercel.json          Vercel Services config: frontend + backend on one domain
+backend/             FastAPI app (routes/), nutrition math (nutrition/), vision providers (vision/)
 backend/data/        Bundled read-only reference DB for Vercel deployment (committed)
 frontend/            React + Vite + TypeScript + Tailwind
-scripts/             Data ingest scripts (USDA, Open Food Facts)
+scripts/             Data ingest scripts (USDA, Open Food Facts) -- local-only, not deployed
 data/                Local dev SQLite DB and downloaded bulk data (gitignored)
 tests/               pytest suite
-requirements.txt      Generated from pyproject.toml/uv.lock, for Vercel's Python runtime
+requirements.txt     Generated from pyproject.toml/uv.lock, for Vercel's Python runtime
 ```

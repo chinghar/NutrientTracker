@@ -5,9 +5,8 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.db import get_raw_connection
-from backend.food_lookup import get_barcode_nutrients, get_barcode_product, get_food_nutrients
+from backend.food_lookup import get_barcode_nutrients, get_barcode_product, get_food_nutrients, search_foods
 from backend.schemas import BarcodeDetail, FoodDetail, FoodSearchResult
-from scripts.ingest_usda import search_foods
 
 router = APIRouter()
 

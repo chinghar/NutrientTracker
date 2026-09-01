@@ -20,6 +20,12 @@ import zipfile
 from pathlib import Path
 from urllib.parse import urljoin
 
+# search_foods lives in backend/food_lookup.py -- the backend is deployed
+# standalone (e.g. as a Vercel service) and must not import from this
+# scripts/ package, so the dependency runs the other way. Re-exported here
+# for backward compatibility (existing callers use ingest_usda.search_foods).
+from backend.food_lookup import search_foods  # noqa: F401
+
 DOWNLOAD_PAGE_URL = "https://fdc.nal.usda.gov/download-datasets.html"
 USER_AGENT = "Mozilla/5.0 (compatible; nutrition-tracker-ingest/1.0)"
 
@@ -391,21 +397,6 @@ def populate_fts(conn: sqlite3.Connection) -> None:
     )
     conn.execute("INSERT INTO foods_fts (rowid, description) SELECT fdc_id, description FROM foods")
     conn.commit()
-
-
-def search_foods(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[sqlite3.Row]:
-    conn.row_factory = sqlite3.Row
-    cur = conn.execute(
-        """
-        SELECT foods.* FROM foods_fts
-        JOIN foods ON foods.fdc_id = foods_fts.rowid
-        WHERE foods_fts MATCH ?
-        ORDER BY rank
-        LIMIT ?
-        """,
-        (query, limit),
-    )
-    return cur.fetchall()
 
 
 def ingest_dataset(conn: sqlite3.Connection, dataset_dir: Path, is_branded: bool) -> None:

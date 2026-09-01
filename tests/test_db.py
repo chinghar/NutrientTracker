@@ -20,10 +20,21 @@ def test_normalize_database_url(raw, expected):
     assert db._normalize_database_url(raw) == expected
 
 
-def test_get_food_db_path_defaults_to_app_db_path(monkeypatch):
+def test_get_food_db_path_defaults_to_app_db_path_locally(monkeypatch):
     monkeypatch.delenv("FOOD_DB_PATH", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("APP_DB_PATH", "/some/path/app.db")
     assert db.get_food_db_path() == "/some/path/app.db"
+
+
+def test_get_food_db_path_defaults_to_bundled_file_in_production(monkeypatch):
+    # DATABASE_URL set (production) with no explicit FOOD_DB_PATH override
+    # should resolve to the bundled reference DB next to backend/db.py,
+    # without needing a second env var configured.
+    monkeypatch.delenv("FOOD_DB_PATH", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pw@host/db")
+    assert db.get_food_db_path() == str(db._BUNDLED_FOOD_DB)
+    assert db._BUNDLED_FOOD_DB.name == "food_reference.db"
 
 
 def test_get_food_db_path_override(monkeypatch):
