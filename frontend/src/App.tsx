@@ -10,6 +10,7 @@ import { MealHistory } from './components/MealHistory'
 import { ProfileForm } from './components/ProfileForm'
 import { SettingsPanel } from './components/SettingsPanel'
 import type { DraftItem, FoodSearchResult, MealIn } from './types'
+import { compressImage } from './utils/image'
 
 type Stage = 'home' | 'photo' | 'barcode' | 'analyzing' | 'correcting' | 'manual-add'
 type View = 'log' | 'dashboard'
@@ -36,10 +37,11 @@ export default function App() {
     setAddingItem(null)
   }
 
-  async function handlePhotoCaptured(blob: Blob) {
+  async function handlePhotoCaptured(rawBlob: Blob) {
     setStage('analyzing')
     setSource('photo')
     try {
+      const blob = await compressImage(rawBlob)
       const result = await analyzeMeal(blob)
       if (result.manual_entry_required || result.items.length === 0) {
         setStatusMessage(result.message ?? 'Could not identify the meal automatically. Search for the foods below.')

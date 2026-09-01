@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -17,9 +18,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Nutrition Tracker API", lifespan=lifespan)
 
+# Local dev's Vite origin is always allowed; add the deployed frontend's
+# origin(s) via CORS_ORIGINS (comma-separated) when running elsewhere.
+_extra_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", *_extra_origins],
     allow_methods=["*"],
     allow_headers=["*"],
 )

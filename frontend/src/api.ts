@@ -14,6 +14,12 @@ import type {
   TargetsOut,
 } from './types'
 
+// Local dev leaves this unset -- requests go to relative /api/... paths,
+// which Vite's dev-server proxy forwards to localhost:8000 (see
+// vite.config.ts). A production deployment where the frontend and backend
+// are separate Vercel projects sets this to the backend project's URL.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.text()
@@ -32,35 +38,35 @@ export async function analyzeMeal(image: Blob, hint?: string): Promise<AnalyzeRe
   const form = new FormData()
   form.append('image', image, 'meal.jpg')
   if (hint) form.append('hint', hint)
-  const res = await fetch('/api/analyze', { method: 'POST', body: form })
+  const res = await fetch(`${API_BASE}/api/analyze`, { method: 'POST', body: form })
   return asJson(res)
 }
 
 export async function searchFoods(query: string, limit = 10): Promise<FoodSearchResult[]> {
   const params = new URLSearchParams({ q: query, limit: String(limit) })
-  const res = await fetch(`/api/search?${params}`)
+  const res = await fetch(`${API_BASE}/api/search?${params}`)
   return asJson(res)
 }
 
 export async function getFoodDetail(fdcId: number, grams: number): Promise<FoodDetail> {
   const params = new URLSearchParams({ grams: String(grams) })
-  const res = await fetch(`/api/foods/${fdcId}?${params}`)
+  const res = await fetch(`${API_BASE}/api/foods/${fdcId}?${params}`)
   return asJson(res)
 }
 
 export async function getBarcodeDetail(code: string, grams = 100): Promise<BarcodeDetail> {
   const params = new URLSearchParams({ grams: String(grams) })
-  const res = await fetch(`/api/barcode/${encodeURIComponent(code)}?${params}`)
+  const res = await fetch(`${API_BASE}/api/barcode/${encodeURIComponent(code)}?${params}`)
   return asJson(res)
 }
 
 export async function getSettings(): Promise<SettingsOut> {
-  const res = await fetch('/api/settings')
+  const res = await fetch(`${API_BASE}/api/settings`)
   return asJson(res)
 }
 
 export async function updateSettings(settings: SettingsOut): Promise<SettingsOut> {
-  const res = await fetch('/api/settings', {
+  const res = await fetch(`${API_BASE}/api/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settings),
@@ -69,7 +75,7 @@ export async function updateSettings(settings: SettingsOut): Promise<SettingsOut
 }
 
 export async function saveMeal(meal: MealIn): Promise<MealOut> {
-  const res = await fetch('/api/meals', {
+  const res = await fetch(`${API_BASE}/api/meals`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(meal),
@@ -79,22 +85,22 @@ export async function saveMeal(meal: MealIn): Promise<MealOut> {
 
 export async function listMeals(date?: string): Promise<MealOut[]> {
   const params = date ? `?${new URLSearchParams({ date })}` : ''
-  const res = await fetch(`/api/meals${params}`)
+  const res = await fetch(`${API_BASE}/api/meals${params}`)
   return asJson(res)
 }
 
 export async function relogMeal(mealId: number): Promise<MealOut> {
-  const res = await fetch(`/api/meals/${mealId}/relog`, { method: 'POST' })
+  const res = await fetch(`${API_BASE}/api/meals/${mealId}/relog`, { method: 'POST' })
   return asJson(res)
 }
 
 export async function getProfile(): Promise<ProfileOut | null> {
-  const res = await fetch('/api/profile')
+  const res = await fetch(`${API_BASE}/api/profile`)
   return asJson(res)
 }
 
 export async function updateProfile(profile: ProfileIn): Promise<ProfileOut> {
-  const res = await fetch('/api/profile', {
+  const res = await fetch(`${API_BASE}/api/profile`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(profile),
@@ -103,18 +109,18 @@ export async function updateProfile(profile: ProfileIn): Promise<ProfileOut> {
 }
 
 export async function getTargets(): Promise<TargetsOut> {
-  const res = await fetch('/api/targets')
+  const res = await fetch(`${API_BASE}/api/targets`)
   return asJson(res)
 }
 
 export async function getDashboard(date?: string): Promise<DashboardOut> {
   const params = date ? `?${new URLSearchParams({ date })}` : ''
-  const res = await fetch(`/api/dashboard${params}`)
+  const res = await fetch(`${API_BASE}/api/dashboard${params}`)
   return asJson(res)
 }
 
 export async function logBodyWeight(entry: BodyWeightIn): Promise<BodyWeightOut> {
-  const res = await fetch('/api/bodyweight', {
+  const res = await fetch(`${API_BASE}/api/bodyweight`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
@@ -123,6 +129,6 @@ export async function logBodyWeight(entry: BodyWeightIn): Promise<BodyWeightOut>
 }
 
 export async function listBodyWeight(): Promise<BodyWeightOut[]> {
-  const res = await fetch('/api/bodyweight')
+  const res = await fetch(`${API_BASE}/api/bodyweight`)
   return asJson(res)
 }

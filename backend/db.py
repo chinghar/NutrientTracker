@@ -1,10 +1,21 @@
-"""SQLModel engine for the app's own tables (logged meals, settings), plus
-a raw sqlite3 connection dependency for querying the Phase 1 ingest tables
-(foods, nutrients, off_products) via backend/food_lookup.py. Both point at
-the same data/app.db file, which SQLite allows.
+"""Two separate storage layers, deliberately not unified:
 
-DB_PATH is read lazily (not at import time) so tests can point it at an
-isolated temp file via the APP_DB_PATH env var before the engine is created.
+1. The app's own writable tables (logged meals, settings, profile,
+   bodyweight) -- a SQLModel engine. Locally this is SQLite at
+   data/app.db. In production (DATABASE_URL set, e.g. Vercel Postgres),
+   it's Postgres, since serverless deployments have no durable local disk
+   for SQLite writes to survive between invocations.
+
+2. The read-only USDA/Open Food Facts reference data (foods, nutrients,
+   off_products) built by the Phase 1 ingest scripts -- always plain
+   sqlite3, opened read-only. Locally this is the same data/app.db file
+   (for developer convenience); in production it's a small pre-built
+   SQLite file bundled into the deployment (see backend/data/), since it
+   never needs writing at runtime and Vercel's deployed filesystem is
+   read-only anyway.
+
+Both paths are read lazily (not at import time) so tests can point them at
+isolated temp files via env vars before anything is created.
 """
 
 from __future__ import annotations
@@ -22,15 +33,38 @@ def get_db_path() -> str:
     return os.environ.get("APP_DB_PATH", "data/app.db")
 
 
+def get_food_db_path() -> str:
+    """Path to the read-only USDA/OFF reference database. Defaults to the
+    same file as get_db_path() for local dev; set FOOD_DB_PATH to point at
+    the bundled backend/data/food_reference.db in production."""
+    return os.environ.get("FOOD_DB_PATH", get_db_path())
+
+
+def _normalize_database_url(url: str) -> str:
+    # Managed Postgres providers commonly hand out `postgres://` or bare
+    # `postgresql://` URLs, which SQLAlchemy resolves to psycopg2 by
+    # default. Force the psycopg (v3) driver we actually depend on.
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
+
 def get_engine():
     global _engine
     if _engine is None:
-        _engine = create_engine(f"sqlite:///{get_db_path()}")
+        database_url = os.environ.get("DATABASE_URL")
+        if database_url:
+            _engine = create_engine(_normalize_database_url(database_url))
+        else:
+            _engine = create_engine(f"sqlite:///{get_db_path()}")
     return _engine
 
 
 def init_db() -> None:
-    Path(get_db_path()).parent.mkdir(parents=True, exist_ok=True)
+    if not os.environ.get("DATABASE_URL"):
+        Path(get_db_path()).parent.mkdir(parents=True, exist_ok=True)
     SQLModel.metadata.create_all(get_engine())
 
 
@@ -40,11 +74,14 @@ def get_session():
 
 
 def get_raw_connection():
+    path = get_food_db_path()
+    # mode=ro: this file is never written at runtime, and production reads
+    # it from a read-only deployment filesystem where a default read-write
+    # open (which SQLite prepares for even for SELECT-only use) would fail.
     # check_same_thread=False: FastAPI dispatches this sync generator
     # dependency to a worker thread separate from an async route's event
-    # loop thread. Safe here since each request gets its own connection --
-    # never shared across concurrent threads.
-    conn = sqlite3.connect(get_db_path(), check_same_thread=False)
+    # loop thread; safe since each request gets its own connection.
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
     try:
         yield conn
     finally:
