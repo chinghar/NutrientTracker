@@ -149,43 +149,6 @@ So the honest minimum for a fully working deployment is **one variable**:
 a working demo with barcode/manual logging and real USDA nutrition data, just
 without photo analysis or durable storage.
 
-### Photo analysis without paying for Anthropic: self-host Ollama
-
-Ollama genuinely cannot run on Vercel (no persistent process), so getting
-free photo analysis in production means running Ollama somewhere *else* and
-pointing the deployed backend at it over the network:
-
-1. On a machine you control (your own computer left on, a spare machine, or
-   a cheap VPS), run Ollama as usual:
-   ```bash
-   ollama serve
-   ollama pull qwen2.5vl
-   ```
-2. **Put the authenticating proxy in front of it before exposing anything.**
-   Ollama has no authentication of its own — tunneling it directly would let
-   anyone who finds the URL use your machine's compute for free.
-   ```bash
-   export OLLAMA_AUTH_PROXY_SECRET=$(openssl rand -hex 32)   # save this value
-   uv run python scripts/ollama_auth_proxy.py   # listens on :11435, forwards to :11434
-   ```
-3. Expose **the proxy's port** (11435, not Ollama's 11434) via a tunnel --
-   e.g. `ngrok http 11435` for a quick test, or
-   [Tailscale Funnel](https://tailscale.com/kb/1223/funnel)/[Cloudflare
-   Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
-   if you want something stable to leave running.
-4. On the Vercel project, set:
-
-   | Variable | Value |
-   |---|---|
-   | `VISION_PROVIDER` | `ollama` (overrides the Vercel default of `anthropic`) |
-   | `OLLAMA_HOST` | the tunnel's public URL (e.g. `https://your-tunnel.example.com`) |
-   | `OLLAMA_API_KEY` | the same value as `OLLAMA_AUTH_PROXY_SECRET` from step 2 |
-
-Requests then flow: Vercel backend → tunnel → auth proxy (checks the shared
-secret) → your local Ollama. Free, but only as available as the machine
-you're running it on -- if that machine is off, photo analysis falls back
-to the manual-entry message rather than erroring.
-
 ### Why the backend service is rooted at the repo root, not `backend/`
 
 Vercel Services treat a service's `root` exactly like a standalone project's

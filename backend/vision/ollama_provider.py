@@ -1,7 +1,5 @@
-"""Default vision provider: an Ollama instance running a vision model --
-local, or self-hosted and reachable over the network (e.g. tunneled to a
-Vercel deployment, where Ollama itself can't run). Zero marginal cost per
-photo either way."""
+"""Default vision provider: a local Ollama instance running a vision model.
+Zero marginal cost per photo."""
 
 from __future__ import annotations
 
@@ -21,11 +19,6 @@ class LocalOllamaProvider(VisionProvider):
         self.host = host or os.environ.get("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
         self.model = model or os.environ.get("OLLAMA_VISION_MODEL", DEFAULT_OLLAMA_MODEL)
         self.timeout = timeout
-        # Ollama itself has no authentication. If OLLAMA_HOST points at a
-        # self-hosted instance exposed over the internet (see
-        # scripts/ollama_auth_proxy.py), set this to the same shared secret
-        # the proxy checks -- otherwise anyone who finds the URL can use it.
-        self.api_key = os.environ.get("OLLAMA_API_KEY")
 
     def analyze(self, image_bytes: bytes, hint: str | None = None) -> MealAnalysis:
         image_b64 = base64.b64encode(image_bytes).decode("ascii")
@@ -41,13 +34,10 @@ class LocalOllamaProvider(VisionProvider):
                 "stream": False,
             }
         ).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
         req = urllib.request.Request(
             f"{self.host.rstrip('/')}/api/generate",
             data=body,
-            headers=headers,
+            headers={"Content-Type": "application/json"},
             method="POST",
         )
         try:
