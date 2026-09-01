@@ -197,3 +197,63 @@ def test_factory_explicit_env_var_overrides_the_vercel_default(monkeypatch):
     monkeypatch.setenv("VERCEL", "1")
     provider = factory.get_vision_provider()
     assert isinstance(provider, LocalOllamaProvider)
+
+
+# --- Ollama shared-secret auth, for a self-hosted instance exposed publicly --
+
+
+def test_ollama_provider_sends_bearer_token_when_api_key_set(monkeypatch):
+    import json
+
+    captured_requests = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return json.dumps({"response": "ok"}).encode()
+
+    def fake_urlopen(req, timeout=None):
+        captured_requests.append(req)
+        return FakeResponse()
+
+    monkeypatch.setattr("backend.vision.ollama_provider.urllib.request.urlopen", fake_urlopen)
+
+    provider = LocalOllamaProvider(host="http://example.com", model="qwen2.5vl")
+    provider.api_key = "shhh-secret"
+    provider._call_ollama("prompt", "aW1hZ2U=")
+
+    assert len(captured_requests) == 1
+    assert captured_requests[0].get_header("Authorization") == "Bearer shhh-secret"
+
+
+def test_ollama_provider_omits_auth_header_when_no_api_key(monkeypatch):
+    import json
+
+    captured_requests = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return json.dumps({"response": "ok"}).encode()
+
+    def fake_urlopen(req, timeout=None):
+        captured_requests.append(req)
+        return FakeResponse()
+
+    monkeypatch.setattr("backend.vision.ollama_provider.urllib.request.urlopen", fake_urlopen)
+
+    provider = LocalOllamaProvider(host="http://localhost:11434", model="qwen2.5vl")
+    assert provider.api_key is None
+    provider._call_ollama("prompt", "aW1hZ2U=")
+
+    assert captured_requests[0].get_header("Authorization") is None
