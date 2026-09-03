@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# raw USDA bulk download cache (not committed; only the pruned public/data output is)
+/scripts/.cache/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

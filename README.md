@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nutrition App
+
+A photo-based nutrition tracking app. Enter body stats and a goal, get daily
+calorie/macro/micronutrient targets, then photograph meals to log intake
+against them. All user data lives in the browser (IndexedDB) — there is no
+server-side database and no environment variables.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). No `.env` file is needed.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Set up your profile at `/profile` first (this computes your daily targets),
+then log meals from `/` (photo, barcode scan, or manual search) and check
+`/dashboard` for your daily/7-day view. Bring your own Anthropic API key in
+`/settings` for photo analysis, or run Ollama locally.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Nutrition database
 
-## Learn More
+The food database (`public/data/foods.json` and `public/data/foods-search-index.json`)
+is **generated once, offline, and committed to the repo** — it is not built at
+Vercel build time or fetched from a live API at runtime. This keeps the Vercel
+build a no-op for nutrition data and avoids shipping any database or API key.
 
-To learn more about Next.js, take a look at the following resources:
+To regenerate it from the current USDA FoodData Central bulk CSV release:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm build:fooddb
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This downloads the USDA Foundation Foods + SR Legacy CSV bulk datasets (public
+domain, no API key) into `scripts/.cache/` (gitignored), keeps only those two
+data types (~8,000 foods, excluding Branded Foods), prunes to ~28 core
+nutrients, and writes:
 
-## Deploy on Vercel
+- `public/data/foods.json` — compact parallel-array food + nutrient data
+- `public/data/foods-search-index.json` — a prebuilt MiniSearch index
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Both generated files **are committed deliberately**. You normally don't need
+to run this script — only re-run it if you want to refresh the dataset from a
+newer USDA release.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Packaged/branded foods and barcode lookups are resolved at runtime directly
+against the [Open Food Facts](https://world.openfoodfacts.org) public API from
+the browser (no key, no proxy — its CORS headers allow direct browser calls).
+
+## Deploying
+
+Import this repo into [Vercel](https://vercel.com/new) and click **Deploy**.
+No configuration is needed: no `vercel.json`, no environment variables, no
+custom build/output settings. Vercel's standard Next.js auto-detection is
+sufficient.
+
+## Testing
+
+```bash
+pnpm test
+```
+
+All nutrition math (targets, calibration, etc.) is written as pure,
+unit-tested functions, run with [Vitest](https://vitest.dev).
