@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import Button from "@/components/ui/Button";
 
 interface CameraCaptureProps {
   onCapture: (blob: Blob) => void;
@@ -30,26 +31,18 @@ export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProp
 function ChoiceScreen({ onChoose, onCancel }: { onChoose: (mode: Mode) => void; onCancel: () => void }) {
   return (
     <div className="space-y-3">
-      <p className="text-sm text-neutral-500">How would you like to add a photo?</p>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onChoose("camera")}
-          className="rounded bg-neutral-900 px-4 py-3 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-        >
+      <p className="text-sm text-toast">How would you like to add a photo?</p>
+      <div className="flex flex-wrap gap-3">
+        <Button type="button" variant="primary" onClick={() => onChoose("camera")}>
           Take a photo
-        </button>
-        <button
-          type="button"
-          onClick={() => onChoose("upload")}
-          className="rounded border border-neutral-300 px-4 py-3 text-sm dark:border-neutral-700"
-        >
+        </Button>
+        <Button type="button" variant="outline" onClick={() => onChoose("upload")}>
           Upload a photo
-        </button>
+        </Button>
       </div>
-      <button type="button" onClick={onCancel} className="text-sm text-neutral-500 underline">
+      <Button type="button" variant="ghost" onClick={onCancel}>
         Cancel
-      </button>
+      </Button>
     </div>
   );
 }
@@ -106,25 +99,20 @@ function CameraScreen({ onCapture, onBack }: { onCapture: (blob: Blob) => void; 
   return (
     <div className="space-y-3">
       {!cameraError && (
-        <div className="overflow-hidden rounded bg-black">
+        <div className="overflow-hidden rounded-lg border-4 border-cocoa">
           <video ref={videoRef} className="w-full" muted playsInline />
         </div>
       )}
-      {cameraError && <p className="text-sm text-neutral-500">{cameraError}</p>}
-      <div className="flex flex-wrap gap-2">
+      {cameraError && <p className="text-sm text-toast">{cameraError}</p>}
+      <div className="flex flex-wrap gap-3">
         {!cameraError && (
-          <button
-            type="button"
-            onClick={handleTakePhoto}
-            disabled={!ready}
-            className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-          >
+          <Button type="button" variant="primary" onClick={handleTakePhoto} disabled={!ready}>
             Take photo
-          </button>
+          </Button>
         )}
-        <button type="button" onClick={onBack} className="text-sm text-neutral-500 underline">
+        <Button type="button" variant="ghost" onClick={onBack}>
           Back
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -174,38 +162,24 @@ function UploadScreen({ onCapture, onBack }: { onCapture: (blob: Blob) => void; 
 
   return (
     <div
-      className={`space-y-3 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-        isDraggingOver
-          ? "border-neutral-400 bg-neutral-100 dark:bg-neutral-900"
-          : "border-neutral-200 dark:border-neutral-800"
+      className={`space-y-3 rounded-lg border-4 border-dashed p-6 text-center transition-colors ${
+        isDraggingOver ? "border-poppy bg-marigold/10" : "border-avocado"
       }`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <p className="text-sm text-neutral-500">
-        {isDraggingOver ? "Drop the photo to use it" : "Drag and drop an image here"}
-      </p>
-      {dropError && <p className="text-sm text-neutral-500">{dropError}</p>}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-        >
+      <p className="text-sm text-toast">{isDraggingOver ? "Drop the photo to use it" : "Drag and drop an image here"}</p>
+      {dropError && <p className="text-sm text-cocoa">{dropError}</p>}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Button type="button" variant="primary" onClick={() => fileInputRef.current?.click()}>
           Choose file
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <button type="button" onClick={onBack} className="text-sm text-neutral-500 underline">
+        </Button>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+        <Button type="button" variant="ghost" onClick={onBack}>
           Back
-        </button>
+        </Button>
       </div>
     </div>
   );

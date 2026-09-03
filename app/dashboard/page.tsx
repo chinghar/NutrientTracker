@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { db, getProfile, type BodyWeightLog, type LoggedMeal, type Profile } from "@/lib/db/db";
 import { applyCalibrationToTarget, computeCalibration, type CalibrationResult } from "@/lib/nutrition/calibration";
@@ -13,6 +14,10 @@ import {
 import { daysBetween, lastNDayStrings, todayString } from "@/lib/nutrition/dates";
 import { getDri } from "@/lib/nutrition/dri";
 import { calculateBMR, calculateTargets, calculateTDEE, CALORIE_FLOOR, type DailyTargets } from "@/lib/nutrition/targets";
+import { useSetupStatus } from "@/lib/onboarding/status";
+import HeroBadge from "@/components/HeroBadge";
+import Button from "@/components/ui/Button";
+import Rule from "@/components/ui/Rule";
 
 const MACRO_KEYS: { key: string; label: string }[] = [
   { key: "proteinG", label: "Protein" },
@@ -21,10 +26,18 @@ const MACRO_KEYS: { key: string; label: string }[] = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const setupStatus = useSetupStatus();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [meals, setMeals] = useState<LoggedMeal[]>([]);
   const [weightLogs, setWeightLogs] = useState<BodyWeightLog[]>([]);
   const [weightInput, setWeightInput] = useState("");
+
+  useEffect(() => {
+    if (!setupStatus.loading && !setupStatus.isReady) {
+      router.replace("/");
+    }
+  }, [setupStatus, router]);
 
   useEffect(() => {
     refresh();
@@ -103,17 +116,17 @@ export default function DashboardPage() {
     return { ...targetsResult.targets, calories };
   }, [targetsResult, calibration, profile]);
 
-  if (profile === undefined) {
-    return <main className="mx-auto max-w-lg p-6 text-sm text-neutral-500">Loading…</main>;
+  if (setupStatus.loading || !setupStatus.isReady || profile === undefined) {
+    return <main className="mx-auto max-w-lg p-6 text-sm text-toast">Loading…</main>;
   }
 
   if (profile === null) {
     return (
       <main className="mx-auto max-w-lg space-y-4 p-6">
-        <h1 className="text-xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-neutral-500">
+        <h1 className="font-display text-3xl">Dashboard</h1>
+        <p className="text-sm text-toast">
           Set up your profile first to see daily targets.{" "}
-          <Link href="/profile" className="underline">
+          <Link href="/profile" className="font-semibold text-cocoa underline underline-offset-2">
             Go to profile
           </Link>
           .
@@ -125,10 +138,10 @@ export default function DashboardPage() {
   if (!targetsResult?.ok) {
     return (
       <main className="mx-auto max-w-lg space-y-4 p-6">
-        <h1 className="text-xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-neutral-500">
+        <h1 className="font-display text-3xl">Dashboard</h1>
+        <p className="text-sm text-toast">
           {targetsResult?.error.message}{" "}
-          <Link href="/profile" className="underline">
+          <Link href="/profile" className="font-semibold text-cocoa underline underline-offset-2">
             Update profile
           </Link>
           .
@@ -138,26 +151,41 @@ export default function DashboardPage() {
   }
 
   const targets = adjustedTargets ?? targetsResult.targets;
+  const heroPercent = rollingCalories.average == null ? 0 : (rollingCalories.average / targets.calories) * 100;
 
   return (
-    <main className="mx-auto max-w-lg space-y-8 p-6">
-      <h1 className="text-xl font-semibold">Dashboard</h1>
+    <main className="mx-auto max-w-lg space-y-10 p-6">
+      <h1 className="font-display text-3xl">Dashboard</h1>
 
-      {calibration && <p className="text-sm text-neutral-500">{calibration.message}</p>}
+      {calibration && <p className="text-sm text-cocoa">{calibration.message}</p>}
 
-      <section>
-        <p className="text-xs text-neutral-500">7-day average calories</p>
-        <p className="text-4xl font-semibold">
-          {rollingCalories.average == null ? "—" : Math.round(rollingCalories.average)}
-          <span className="ml-1 text-base font-normal text-neutral-500">/ {targets.calories} kcal</span>
-        </p>
-        <p className="text-xs text-neutral-400">
-          {rollingCalories.daysWithData} of last 7 days logged — single-day estimates are noisy, this average is more reliable.
+      {/* The one hero element on the app: the 7-day rolling average, visually dominant
+          over today's single-day number below it — single-meal estimates are noisy,
+          weekly averages are not, and that hierarchy is a correctness decision. */}
+      <section className="space-y-2 text-center">
+        <HeroBadge
+          value={rollingCalories.average == null ? "—" : String(Math.round(rollingCalories.average))}
+          captionLines={[`of ${targets.calories} kcal target`, "7-day average"]}
+          percent={heroPercent}
+        />
+        <p className="text-sm text-toast">
+          {rollingCalories.daysWithData} of last 7 days logged — single-day estimates are noisy, this average is more
+          reliable.
         </p>
       </section>
 
-      <section className="space-y-2 rounded border border-neutral-200 p-4 dark:border-neutral-800">
-        <p className="text-xs text-neutral-500">Today</p>
+      <Rule color="toast" />
+
+      <section className="space-y-3">
+        <p className="text-xs font-bold text-toast">Today</p>
+        {!todayTotals && (
+          <p className="text-sm text-toast">
+            <Link href="/log" className="font-semibold text-cocoa underline underline-offset-2">
+              Photograph, scan, or search for your first meal today
+            </Link>{" "}
+            to see it here.
+          </p>
+        )}
         <NutrientBar label="Calories" value={todayTotals?.energyKcal?.value ?? null} target={targets.calories} />
         {MACRO_KEYS.map(({ key, label }) => (
           <NutrientBar
@@ -170,35 +198,40 @@ export default function DashboardPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium">Log bodyweight</h2>
-        <div className="flex items-center gap-2">
+        <h2 className="text-sm font-bold">Log bodyweight</h2>
+        <div className="flex items-center gap-3">
           <input
             type="number"
             step={0.1}
             value={weightInput}
             onChange={(e) => setWeightInput(e.target.value)}
             placeholder="kg"
-            className="w-24 rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            className="min-h-11 w-24 rounded-lg border-2 border-toast/40 bg-white px-3 py-2 text-base text-cocoa"
           />
-          <button
-            type="button"
-            onClick={handleLogWeight}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
-          >
+          <Button type="button" variant="outline" onClick={handleLogWeight}>
             Log weight
-          </button>
+          </Button>
         </div>
       </section>
 
-      <details className="rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
-        <summary className="cursor-pointer font-medium">Micronutrients today</summary>
-        <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto">
+      <Rule color="avocado" />
+
+      <details>
+        <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">Micronutrients today</summary>
+        <ul className="mt-2 max-h-80 divide-y divide-toast/15 overflow-y-auto text-sm">
           {Object.keys(todayTotals ?? {})
             .filter((key) => getDri(key, profile.sex, profile.age) !== undefined)
             .map((key) => (
               <MicronutrientRow key={key} nutrientKey={key} summary={todayTotals![key]} sex={profile.sex} age={profile.age} />
             ))}
-          {!todayTotals && <li className="text-neutral-400">Nothing logged today yet.</li>}
+          {!todayTotals && (
+            <li className="py-2 text-toast">
+              <Link href="/log" className="font-semibold text-cocoa underline underline-offset-2">
+                Log a meal
+              </Link>{" "}
+              to fill this in.
+            </li>
+          )}
         </ul>
       </details>
     </main>
@@ -210,16 +243,17 @@ function NutrientBar({ label, value, target }: { label: string; value: number | 
   const over = value != null && value > target;
   return (
     <div>
-      <div className="flex justify-between text-xs text-neutral-500">
-        <span>{label}</span>
+      <div className="flex justify-between text-sm text-cocoa">
+        <span className="font-semibold">{label}</span>
         <span>
           {value == null ? "—" : Math.round(value)} / {Math.round(target)}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-neutral-100 dark:bg-neutral-800">
-        <div className="h-2 rounded-full bg-neutral-600 dark:bg-neutral-300" style={{ width: `${pct}%` }} />
+      <div className="h-2.5 rounded-full bg-toast/15">
+        <div className="h-2.5 rounded-full bg-marigold" style={{ width: `${pct}%` }} />
       </div>
-      {over && <p className="text-xs text-neutral-400">Over today&apos;s target — just information, no penalty.</p>}
+      {/* Over target renders in Toast — the deliberate calm neutral, never red/alarm-coded. */}
+      {over && <p className="text-xs text-toast">Over today&apos;s target — just information, no penalty.</p>}
     </div>
   );
 }
@@ -243,17 +277,20 @@ function MicronutrientRow({
   const overUL = dri.ul != null && value != null && value >= dri.ul;
 
   return (
-    <li className="flex items-center justify-between">
-      <span className="text-neutral-500">{nutrientKey}</span>
-      <span>
+    <li className="flex items-center justify-between py-1.5">
+      <span className="text-toast">{nutrientKey}</span>
+      <span className="font-semibold tabular-nums text-cocoa">
         {value == null ? "—" : `${roundToSignificantFigures(pct!, 2)}% RDA`}
         {summary.lowConfidence && (
-          <span className="ml-1 text-amber-500" title="Low confidence">
+          <span className="ml-1 font-normal text-toast" title="Low confidence">
             ●
           </span>
         )}
         {(overUL || nearUL) && (
-          <span className="ml-1 text-amber-500" title={overUL ? "At or above the upper intake limit" : "Approaching the upper intake limit"}>
+          <span
+            className="ml-1 text-poppy"
+            title={overUL ? "At or above the upper intake limit" : "Approaching the upper intake limit"}
+          >
             ⚠
           </span>
         )}

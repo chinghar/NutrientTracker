@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";
+import Button from "@/components/ui/Button";
 
 interface BarcodeDetectorResult {
   rawValue: string;
@@ -97,7 +98,7 @@ export default function BarcodeScanner({ onDetected, onCancel }: BarcodeScannerP
 
   return (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded bg-black">
+      <div className="overflow-hidden rounded-lg border-4 border-cocoa bg-black">
         <video ref={videoRef} className="w-full" muted playsInline />
       </div>
       {error && (
@@ -113,16 +114,16 @@ export default function BarcodeScanner({ onDetected, onCancel }: BarcodeScannerP
             onChange={(e) => setManualEntry(e.target.value)}
             placeholder="Barcode number"
             inputMode="numeric"
-            className="flex-1 rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            className="min-h-11 flex-1 rounded-lg border-2 border-toast/40 bg-white px-3 py-2 text-base text-cocoa"
           />
-          <button type="submit" className="rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700">
+          <Button type="submit" variant="outline">
             Look up
-          </button>
+          </Button>
         </form>
       )}
-      <button type="button" onClick={onCancel} className="text-sm text-neutral-500 underline">
+      <Button type="button" variant="ghost" onClick={onCancel}>
         Cancel
-      </button>
+      </Button>
     </div>
   );
 }
