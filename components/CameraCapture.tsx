@@ -7,18 +7,57 @@ interface CameraCaptureProps {
   onCancel: () => void;
 }
 
+type Mode = "choice" | "camera" | "upload";
+
 /**
- * Live camera capture via getUserMedia, with a file-upload fallback (click
- * or drag-and-drop) when the camera is unavailable or denied.
+ * Lets the user choose between taking a live photo (getUserMedia) or
+ * uploading one (click-to-browse or drag-and-drop) before committing to
+ * either path — so camera permission is only requested if they actually
+ * pick "Take a photo".
  */
 export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
+  const [mode, setMode] = useState<Mode>("choice");
+
+  return (
+    <div className="space-y-3">
+      {mode === "choice" && <ChoiceScreen onChoose={setMode} onCancel={onCancel} />}
+      {mode === "camera" && <CameraScreen onCapture={onCapture} onBack={() => setMode("choice")} />}
+      {mode === "upload" && <UploadScreen onCapture={onCapture} onBack={() => setMode("choice")} />}
+    </div>
+  );
+}
+
+function ChoiceScreen({ onChoose, onCancel }: { onChoose: (mode: Mode) => void; onCancel: () => void }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-neutral-500">How would you like to add a photo?</p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onChoose("camera")}
+          className="rounded bg-neutral-900 px-4 py-3 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
+        >
+          Take a photo
+        </button>
+        <button
+          type="button"
+          onClick={() => onChoose("upload")}
+          className="rounded border border-neutral-300 px-4 py-3 text-sm dark:border-neutral-700"
+        >
+          Upload a photo
+        </button>
+      </div>
+      <button type="button" onClick={onCancel} className="text-sm text-neutral-500 underline">
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+function CameraScreen({ onCapture, onBack }: { onCapture: (blob: Blob) => void; onBack: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const dragCounter = useRef(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [dropError, setDropError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,7 +67,7 @@ export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProp
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       } catch {
-        if (!cancelled) setCameraError("Camera is unavailable or access was denied. Upload a photo instead.");
+        if (!cancelled) setCameraError("Camera is unavailable or access was denied. Go back and upload a photo instead.");
         return;
       }
       if (cancelled || !videoRef.current) {
@@ -63,6 +102,39 @@ export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProp
       0.92,
     );
   }
+
+  return (
+    <div className="space-y-3">
+      {!cameraError && (
+        <div className="overflow-hidden rounded bg-black">
+          <video ref={videoRef} className="w-full" muted playsInline />
+        </div>
+      )}
+      {cameraError && <p className="text-sm text-neutral-500">{cameraError}</p>}
+      <div className="flex flex-wrap gap-2">
+        {!cameraError && (
+          <button
+            type="button"
+            onClick={handleTakePhoto}
+            disabled={!ready}
+            className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+          >
+            Take photo
+          </button>
+        )}
+        <button type="button" onClick={onBack} className="text-sm text-neutral-500 underline">
+          Back
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function UploadScreen({ onCapture, onBack }: { onCapture: (blob: Blob) => void; onBack: () => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounter = useRef(0);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -102,51 +174,37 @@ export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProp
 
   return (
     <div
-      className={`space-y-3 rounded-lg p-2 transition-colors ${
-        isDraggingOver ? "bg-neutral-100 outline-2 outline-dashed outline-neutral-400 dark:bg-neutral-900" : ""
+      className={`space-y-3 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+        isDraggingOver
+          ? "border-neutral-400 bg-neutral-100 dark:bg-neutral-900"
+          : "border-neutral-200 dark:border-neutral-800"
       }`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {!cameraError && (
-        <div className="overflow-hidden rounded bg-black">
-          <video ref={videoRef} className="w-full" muted playsInline />
-        </div>
-      )}
-      {cameraError && <p className="text-sm text-neutral-500">{cameraError}</p>}
-      {isDraggingOver && <p className="text-center text-sm text-neutral-500">Drop the photo to use it</p>}
+      <p className="text-sm text-neutral-500">
+        {isDraggingOver ? "Drop the photo to use it" : "Drag and drop an image here"}
+      </p>
       {dropError && <p className="text-sm text-neutral-500">{dropError}</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        {!cameraError && (
-          <button
-            type="button"
-            onClick={handleTakePhoto}
-            disabled={!ready}
-            className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-          >
-            Take photo
-          </button>
-        )}
+      <div className="flex flex-wrap items-center justify-center gap-2">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="rounded border border-neutral-300 px-4 py-2 text-sm dark:border-neutral-700"
+          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
         >
-          Upload photo
+          Choose file
         </button>
-        <span className="text-xs text-neutral-400">or drag and drop an image anywhere here</span>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handleFileChange}
           className="hidden"
         />
-        <button type="button" onClick={onCancel} className="text-sm text-neutral-500 underline">
-          Cancel
+        <button type="button" onClick={onBack} className="text-sm text-neutral-500 underline">
+          Back
         </button>
       </div>
     </div>
