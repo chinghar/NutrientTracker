@@ -72,4 +72,11 @@ describe("parseExportedData", () => {
     expect(data.profile?.goal).toBe("fat_loss");
     expect(data.bodyWeightLogs).toHaveLength(1);
   });
+
+  it("accepts gemini as a visionProvider value", () => {
+    const withGemini = JSON.parse(VALID_EXPORT);
+    withGemini.settings.visionProvider = "gemini";
+    const data = parseExportedData(JSON.stringify(withGemini));
+    expect(data.settings.visionProvider).toBe("gemini");
+  });
 });
