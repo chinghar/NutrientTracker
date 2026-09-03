@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// "/" isn't linked here: once setup is complete it just redirects straight to
+// /dashboard (by design — see the setup-gate behavior), so a persistent "Home"
+// nav entry would only ever be a slower path to a page already in this list.
+// It's still reachable directly, and via the setup banner while incomplete.
 const LINKS = [
-  { href: "/", label: "Home" },
   { href: "/log", label: "Log" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/profile", label: "Profile" },
