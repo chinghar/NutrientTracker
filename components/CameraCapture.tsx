@@ -1,18 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
 interface CameraCaptureProps {
   onCapture: (blob: Blob) => void;
   onCancel: () => void;
 }
 
-/** Live camera capture via getUserMedia, with a file-upload fallback when the camera is unavailable or denied. */
+/**
+ * Live camera capture via getUserMedia, with a file-upload fallback (click
+ * or drag-and-drop) when the camera is unavailable or denied.
+ */
 export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounter = useRef(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,15 +69,56 @@ export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProp
     if (file) onCapture(file);
   }
 
+  function handleDragEnter(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragCounter.current++;
+    if (e.dataTransfer.types.includes("Files")) setIsDraggingOver(true);
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    // Required for onDrop to fire at all.
+    e.preventDefault();
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setIsDraggingOver(false);
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDraggingOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setDropError("That file isn't an image. Drop a photo (JPEG, PNG, etc.) instead.");
+      return;
+    }
+    setDropError(null);
+    onCapture(file);
+  }
+
   return (
-    <div className="space-y-3">
+    <div
+      className={`space-y-3 rounded-lg p-2 transition-colors ${
+        isDraggingOver ? "bg-neutral-100 outline-2 outline-dashed outline-neutral-400 dark:bg-neutral-900" : ""
+      }`}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {!cameraError && (
         <div className="overflow-hidden rounded bg-black">
           <video ref={videoRef} className="w-full" muted playsInline />
         </div>
       )}
       {cameraError && <p className="text-sm text-neutral-500">{cameraError}</p>}
-      <div className="flex flex-wrap gap-2">
+      {isDraggingOver && <p className="text-center text-sm text-neutral-500">Drop the photo to use it</p>}
+      {dropError && <p className="text-sm text-neutral-500">{dropError}</p>}
+      <div className="flex flex-wrap items-center gap-2">
         {!cameraError && (
           <button
             type="button"
@@ -89,6 +136,7 @@ export default function CameraCapture({ onCapture, onCancel }: CameraCaptureProp
         >
           Upload photo
         </button>
+        <span className="text-xs text-neutral-400">or drag and drop an image anywhere here</span>
         <input
           ref={fileInputRef}
           type="file"
