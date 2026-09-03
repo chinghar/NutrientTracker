@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { getSettings, saveSettings, type VisionProviderId } from "@/lib/db/db";
 import { exportAllData, importAllData } from "@/lib/db/export";
 import { AnthropicBrowserProvider } from "@/lib/vision/anthropic-provider";
+import { GeminiBrowserProvider } from "@/lib/vision/gemini-provider";
 import { isOllamaAvailable } from "@/lib/vision/ollama-provider";
 
 type TestStatus = { state: "idle" } | { state: "testing" } | { state: "success" } | { state: "error"; message: string };
@@ -13,19 +14,22 @@ type ImportStatus =
   | { state: "error"; message: string };
 
 export default function SettingsPage() {
-  const [apiKey, setApiKey] = useState("");
+  const [anthropicApiKey, setAnthropicApiKey] = useState("");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [visionProvider, setVisionProvider] = useState<VisionProviderId>("anthropic");
   const [plateDiameterCm, setPlateDiameterCm] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
-  const [testStatus, setTestStatus] = useState<TestStatus>({ state: "idle" });
+  const [anthropicTestStatus, setAnthropicTestStatus] = useState<TestStatus>({ state: "idle" });
+  const [geminiTestStatus, setGeminiTestStatus] = useState<TestStatus>({ state: "idle" });
   const [importStatus, setImportStatus] = useState<ImportStatus>({ state: "idle" });
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     getSettings().then((settings) => {
-      setApiKey(settings.anthropicApiKey ?? "");
+      setAnthropicApiKey(settings.anthropicApiKey ?? "");
+      setGeminiApiKey(settings.geminiApiKey ?? "");
       setVisionProvider(settings.visionProvider);
       setPlateDiameterCm(settings.plateDiameterCm != null ? String(settings.plateDiameterCm) : "");
       setOllamaAvailable(isOllamaAvailable());
@@ -36,7 +40,8 @@ export default function SettingsPage() {
   async function handleSave() {
     const parsedDiameter = parseFloat(plateDiameterCm);
     await saveSettings({
-      anthropicApiKey: apiKey || undefined,
+      anthropicApiKey: anthropicApiKey || undefined,
+      geminiApiKey: geminiApiKey || undefined,
       visionProvider,
       plateDiameterCm: Number.isFinite(parsedDiameter) && parsedDiameter > 0 ? parsedDiameter : undefined,
     });
@@ -44,11 +49,18 @@ export default function SettingsPage() {
     setTimeout(() => setSaveStatus("idle"), 2000);
   }
 
-  async function handleTestKey() {
-    setTestStatus({ state: "testing" });
-    const provider = new AnthropicBrowserProvider(apiKey);
+  async function handleTestAnthropicKey() {
+    setAnthropicTestStatus({ state: "testing" });
+    const provider = new AnthropicBrowserProvider(anthropicApiKey);
     const result = await provider.testKey();
-    setTestStatus(result.ok ? { state: "success" } : { state: "error", message: result.error });
+    setAnthropicTestStatus(result.ok ? { state: "success" } : { state: "error", message: result.error });
+  }
+
+  async function handleTestGeminiKey() {
+    setGeminiTestStatus({ state: "testing" });
+    const provider = new GeminiBrowserProvider(geminiApiKey);
+    const result = await provider.testKey();
+    setGeminiTestStatus(result.ok ? { state: "success" } : { state: "error", message: result.error });
   }
 
   async function handleExport() {
@@ -85,8 +97,8 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-xl font-semibold">Settings</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          Your API key is stored only in this browser (IndexedDB) and is sent directly to Anthropic — it never
-          passes through any server.
+          Your API key is stored only in this browser (IndexedDB) and is sent directly to the provider you choose —
+          it never passes through any server.
         </p>
       </div>
 
@@ -100,7 +112,16 @@ export default function SettingsPage() {
               checked={visionProvider === "anthropic"}
               onChange={() => setVisionProvider("anthropic")}
             />
-            Claude (your API key)
+            Claude (Anthropic API key)
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="visionProvider"
+              checked={visionProvider === "gemini"}
+              onChange={() => setVisionProvider("gemini")}
+            />
+            Gemini (free API key)
           </label>
           {ollamaAvailable && (
             <label className="flex items-center gap-2 text-sm">
@@ -123,10 +144,10 @@ export default function SettingsPage() {
             type="password"
             autoComplete="off"
             spellCheck={false}
-            value={apiKey}
+            value={anthropicApiKey}
             onChange={(e) => {
-              setApiKey(e.target.value);
-              setTestStatus({ state: "idle" });
+              setAnthropicApiKey(e.target.value);
+              setAnthropicTestStatus({ state: "idle" });
             }}
             placeholder="sk-ant-..."
             className="w-full rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
@@ -134,15 +155,54 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handleTestKey}
-              disabled={!apiKey || testStatus.state === "testing"}
+              onClick={handleTestAnthropicKey}
+              disabled={!anthropicApiKey || anthropicTestStatus.state === "testing"}
               className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700"
             >
-              {testStatus.state === "testing" ? "Testing…" : "Test key"}
+              {anthropicTestStatus.state === "testing" ? "Testing…" : "Test key"}
             </button>
-            {testStatus.state === "success" && <span className="text-sm text-neutral-500">Key works.</span>}
-            {testStatus.state === "error" && (
-              <span className="text-sm text-neutral-500">{testStatus.message}</span>
+            {anthropicTestStatus.state === "success" && <span className="text-sm text-neutral-500">Key works.</span>}
+            {anthropicTestStatus.state === "error" && (
+              <span className="text-sm text-neutral-500">{anthropicTestStatus.message}</span>
+            )}
+          </div>
+        </section>
+      )}
+
+      {visionProvider === "gemini" && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium">Gemini API key</h2>
+          <p className="text-sm text-neutral-500">
+            Free, no payment required. Get a key at{" "}
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="underline">
+              aistudio.google.com
+            </a>
+            .
+          </p>
+          <input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={geminiApiKey}
+            onChange={(e) => {
+              setGeminiApiKey(e.target.value);
+              setGeminiTestStatus({ state: "idle" });
+            }}
+            placeholder="AIza..."
+            className="w-full rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleTestGeminiKey}
+              disabled={!geminiApiKey || geminiTestStatus.state === "testing"}
+              className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700"
+            >
+              {geminiTestStatus.state === "testing" ? "Testing…" : "Test key"}
+            </button>
+            {geminiTestStatus.state === "success" && <span className="text-sm text-neutral-500">Key works.</span>}
+            {geminiTestStatus.state === "error" && (
+              <span className="text-sm text-neutral-500">{geminiTestStatus.message}</span>
             )}
           </div>
         </section>
@@ -181,7 +241,7 @@ export default function SettingsPage() {
       <section className="space-y-3 border-t border-neutral-200 pt-6 dark:border-neutral-800">
         <h2 className="text-sm font-medium">Backup</h2>
         <p className="text-sm text-neutral-500">
-          There is no server, so this export is your only backup. It does not include your API key.
+          There is no server, so this export is your only backup. It does not include your API keys.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <button

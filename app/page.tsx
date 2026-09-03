@@ -9,6 +9,7 @@ import { db, getSettings, type LoggedMeal, type Settings } from "@/lib/db/db";
 import { loadFoodDb, searchFoods, type FoodDb } from "@/lib/food-db/repository";
 import { lookupBarcode } from "@/lib/food-db/open-food-facts";
 import { AnthropicBrowserProvider } from "@/lib/vision/anthropic-provider";
+import { GeminiBrowserProvider } from "@/lib/vision/gemini-provider";
 import { OllamaProvider } from "@/lib/vision/ollama-provider";
 import type { MealAnalysis, VisionProvider } from "@/lib/vision/types";
 import { makeLocalId, type MealItemDraft } from "@/lib/meal";
@@ -18,6 +19,9 @@ type Step = "home" | "camera" | "barcode" | "search" | "analyzing" | "correcting
 function buildProvider(settings: Settings): VisionProvider | null {
   if (settings.visionProvider === "anthropic") {
     return settings.anthropicApiKey ? new AnthropicBrowserProvider(settings.anthropicApiKey) : null;
+  }
+  if (settings.visionProvider === "gemini") {
+    return settings.geminiApiKey ? new GeminiBrowserProvider(settings.geminiApiKey) : null;
   }
   return new OllamaProvider();
 }
@@ -70,7 +74,7 @@ export default function HomePage() {
 
     const provider = buildProvider(settings);
     if (!provider) {
-      setError("No vision provider is configured. Add your Anthropic API key in Settings, or search/scan manually.");
+      setError("No vision provider is configured. Add an API key (Anthropic or the free Gemini tier) in Settings, or search/scan manually.");
       setStep("home");
       return;
     }

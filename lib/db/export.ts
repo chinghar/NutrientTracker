@@ -38,7 +38,7 @@ const exportSchema = z.object({
   version: z.number(),
   // Deliberately excludes the API key — it must never be written to a file.
   settings: z.object({
-    visionProvider: z.enum(["anthropic", "ollama"]),
+    visionProvider: z.enum(["anthropic", "gemini", "ollama"]),
     plateDiameterCm: z.number().optional(),
   }),
   profile: profileSchema.optional(),

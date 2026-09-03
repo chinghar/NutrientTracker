@@ -2,12 +2,14 @@ import Dexie, { type Table } from "dexie";
 import type { Sex } from "@/lib/nutrition/dri";
 import type { ActivityLevel, Goal } from "@/lib/nutrition/targets";
 
-export type VisionProviderId = "anthropic" | "ollama";
+export type VisionProviderId = "anthropic" | "gemini" | "ollama";
 
 export interface Settings {
   /** Singleton row id — there is only ever one settings record. */
   id: "app";
   anthropicApiKey?: string;
+  /** Google AI Studio key — free tier, no payment required. */
+  geminiApiKey?: string;
   visionProvider: VisionProviderId;
   /** Default plate diameter in cm, passed to the vision provider as a scale hint. */
   plateDiameterCm?: number;
