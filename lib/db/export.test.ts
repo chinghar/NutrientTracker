@@ -79,4 +79,17 @@ describe("parseExportedData", () => {
     const data = parseExportedData(JSON.stringify(withGemini));
     expect(data.settings.visionProvider).toBe("gemini");
   });
+
+  it("round-trips a chosen geminiModel, and defaults it to undefined when absent (no key ever included)", () => {
+    const withModel = JSON.parse(VALID_EXPORT);
+    withModel.settings.visionProvider = "gemini";
+    withModel.settings.geminiModel = "gemini-3.6-flash";
+    withModel.settings.geminiApiKey = "should-not-survive";
+    const data = parseExportedData(JSON.stringify(withModel));
+    expect(data.settings.geminiModel).toBe("gemini-3.6-flash");
+    expect((data.settings as Record<string, unknown>).geminiApiKey).toBeUndefined();
+
+    const withoutModel = parseExportedData(VALID_EXPORT);
+    expect(withoutModel.settings.geminiModel).toBeUndefined();
+  });
 });

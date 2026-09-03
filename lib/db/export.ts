@@ -36,9 +36,10 @@ const profileSchema = z.object({
 const exportSchema = z.object({
   exportedAt: z.string(),
   version: z.number(),
-  // Deliberately excludes the API key — it must never be written to a file.
+  // Deliberately excludes API keys — they must never be written to a file.
   settings: z.object({
     visionProvider: z.enum(["anthropic", "gemini", "ollama"]),
+    geminiModel: z.string().optional(),
     plateDiameterCm: z.number().optional(),
   }),
   profile: profileSchema.optional(),
@@ -62,7 +63,7 @@ export async function exportAllData(): Promise<ExportedData> {
   return {
     exportedAt: new Date().toISOString(),
     version: EXPORT_VERSION,
-    settings: { visionProvider: settings.visionProvider, plateDiameterCm: settings.plateDiameterCm },
+    settings: { visionProvider: settings.visionProvider, geminiModel: settings.geminiModel, plateDiameterCm: settings.plateDiameterCm },
     profile: profile
       ? {
           sex: profile.sex,
@@ -100,7 +101,11 @@ export function parseExportedData(json: string): ExportedData {
 /** Restores settings (except the API key, which the user re-enters), profile, meal logs, and bodyweight logs from an exported JSON file. */
 export async function importAllData(json: string): Promise<{ mealCount: number; weightLogCount: number }> {
   const data = parseExportedData(json);
-  await saveSettings({ visionProvider: data.settings.visionProvider, plateDiameterCm: data.settings.plateDiameterCm });
+  await saveSettings({
+    visionProvider: data.settings.visionProvider,
+    geminiModel: data.settings.geminiModel,
+    plateDiameterCm: data.settings.plateDiameterCm,
+  });
   if (data.profile) await saveProfile(data.profile);
   await db.mealLogs.bulkPut(data.mealLogs as LoggedMeal[]);
   await db.bodyWeightLogs.bulkPut(data.bodyWeightLogs as BodyWeightLog[]);

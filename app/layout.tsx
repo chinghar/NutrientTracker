@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bagel_Fat_One, Karla } from "next/font/google";
 import NavBar from "@/components/NavBar";
+import SetupBanner from "@/components/SetupBanner";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/** Display face — spent in exactly two places per screen: the hero number and page titles. */
+const displayFont = Bagel_Fat_One({
+  variable: "--font-display-raw",
   subsets: ["latin"],
+  weight: "400",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+/** Body/UI face — everything else, including the dense micronutrient list. */
+const bodyFont = Karla({
+  variable: "--font-body-raw",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -20,12 +25,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-butter text-cocoa font-body">
         <NavBar />
+        <SetupBanner />
         {children}
       </body>
     </html>
