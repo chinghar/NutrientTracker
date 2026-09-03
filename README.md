@@ -12,7 +12,7 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). No `.env` file is needed.
+Open https://nutrientracker-lake.vercel.app/dashboard. No `.env` file is needed.
 
 Set up your profile at `/profile` first (this computes your daily targets),
 then log meals from `/` (photo, barcode scan, or manual search) and check
