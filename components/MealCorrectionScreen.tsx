@@ -11,6 +11,8 @@ import type { MealItemDraft } from "@/lib/meal";
 import type { FoodDb } from "@/lib/food-db/repository";
 import type { FoodRecord } from "@/lib/food-db/types";
 import FoodSearch from "./FoodSearch";
+import Button from "@/components/ui/Button";
+import Rule from "@/components/ui/Rule";
 
 const UNIT_LABELS: Record<string, string> = { KCAL: "kcal", G: "g", MG: "mg", UG: "µg" };
 
@@ -66,8 +68,8 @@ export default function MealCorrectionScreen({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-neutral-500">Estimated calories</p>
-        <p className="text-2xl font-semibold">
+        <p className="text-sm text-toast">Estimated calories</p>
+        <p className="font-display text-4xl">
           {calorieRange.low === calorieRange.high
             ? `${calorieRange.point} kcal`
             : `${calorieRange.low}–${calorieRange.high} kcal`}
@@ -79,31 +81,41 @@ export default function MealCorrectionScreen({
           const summary = nutrientSummary[key];
           const value = summary?.value;
           return (
-            <div key={key} className="rounded border border-neutral-200 p-2 dark:border-neutral-800">
-              <p className="text-xs text-neutral-500">{MACRO_LABELS[key]}</p>
-              <p className="text-sm font-medium">
+            <div key={key}>
+              <p className="text-xs text-toast">{MACRO_LABELS[key]}</p>
+              <p className="text-base font-bold text-cocoa">
                 {value == null ? "—" : `${Math.round(value)} g`}
-                {summary?.lowConfidence && <span className="ml-1 text-amber-500" title="Low confidence">●</span>}
+                {summary?.lowConfidence && (
+                  <span className="ml-1 text-toast" title="Low confidence">
+                    ●
+                  </span>
+                )}
               </p>
             </div>
           );
         })}
       </div>
 
-      <details className="rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
-        <summary className="cursor-pointer font-medium">Micronutrients</summary>
-        <ul className="mt-2 space-y-1">
+      <Rule color="toast" />
+
+      <details>
+        <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">Micronutrients</summary>
+        <ul className="mt-2 divide-y divide-toast/15 text-sm">
           {Object.entries(foodDb.data.nutrientUnits)
             .filter(([key]) => !MACRO_KEYS.includes(key) && key !== "energyKcal" && key !== "satFatG" && key !== "sugarG")
             .map(([key, unit]) => {
               const summary = nutrientSummary[key];
               const value = summary?.value;
               return (
-                <li key={key} className="flex items-center justify-between">
-                  <span className="text-neutral-500">{key}</span>
-                  <span>
+                <li key={key} className="flex items-center justify-between py-1.5">
+                  <span className="text-toast">{key}</span>
+                  <span className="font-semibold text-cocoa">
                     {value == null ? "—" : `${roundToSignificantFigures(value, 2)} ${UNIT_LABELS[unit] ?? unit}`}
-                    {summary?.lowConfidence && <span className="ml-1 text-amber-500" title="Low confidence">●</span>}
+                    {summary?.lowConfidence && (
+                      <span className="ml-1 font-normal text-toast" title="Low confidence">
+                        ●
+                      </span>
+                    )}
                   </span>
                 </li>
               );
@@ -111,7 +123,7 @@ export default function MealCorrectionScreen({
         </ul>
       </details>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {items.map((item) => (
           <MealItemEditor
             key={item.localId}
@@ -126,32 +138,23 @@ export default function MealCorrectionScreen({
       {addingItem ? (
         <div className="space-y-2">
           <FoodSearch foodDb={foodDb} onSelect={addItem} placeholder="Add another food…" autoFocus />
-          <button type="button" onClick={() => setAddingItem(false)} className="text-sm text-neutral-500 underline">
+          <Button type="button" variant="ghost" onClick={() => setAddingItem(false)}>
             Cancel
-          </button>
+          </Button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setAddingItem(true)}
-          className="w-full rounded border border-dashed border-neutral-300 py-2 text-sm text-neutral-500 dark:border-neutral-700"
-        >
+        <Button type="button" variant="outline" onClick={() => setAddingItem(true)} className="w-full">
           + Add item
-        </button>
+        </Button>
       )}
 
-      <div className="flex items-center gap-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={items.length === 0 || saving}
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-        >
+      <div className="flex items-center gap-4 pt-2">
+        <Button type="button" variant="primary" onClick={onSave} disabled={items.length === 0 || saving}>
           {saving ? "Saving…" : "Save meal"}
-        </button>
-        <button type="button" onClick={onCancel} className="text-sm text-neutral-500 underline">
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>
           Discard
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -168,20 +171,21 @@ function MealItemEditor({ item, foodDb, onChange, onRemove }: MealItemEditorProp
   const [changingFood, setChangingFood] = useState(false);
 
   return (
-    <div className="rounded border border-neutral-200 p-3 dark:border-neutral-800">
-      <div className="flex items-start justify-between gap-2">
+    <div>
+      <Rule color="poppy" />
+      <div className="flex items-start justify-between gap-2 pt-3">
         <div>
-          <p className="text-sm font-medium">{item.name}</p>
-          {item.reasoning && <p className="text-xs text-neutral-500">{item.reasoning}</p>}
-          <p className="text-xs text-neutral-400">Confidence: {Math.round(item.confidence * 100)}%</p>
+          <p className="text-base font-bold">{item.name}</p>
+          {item.reasoning && <p className="text-xs text-toast">{item.reasoning}</p>}
+          <p className="text-xs text-toast">Confidence: {Math.round(item.confidence * 100)}%</p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <button type="button" onClick={() => setChangingFood((v) => !v)} className="text-xs text-neutral-500 underline">
+        <div className="flex shrink-0 gap-3">
+          <Button type="button" variant="ghost" onClick={() => setChangingFood((v) => !v)} className="text-xs">
             Change food
-          </button>
-          <button type="button" onClick={onRemove} className="text-xs text-neutral-500 underline">
+          </Button>
+          <Button type="button" variant="ghost" onClick={onRemove} className="text-xs">
             Remove
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -206,25 +210,25 @@ function MealItemEditor({ item, foodDb, onChange, onRemove }: MealItemEditorProp
           step={5}
           value={item.grams}
           onChange={(e) => onChange({ grams: Number(e.target.value) })}
-          className="flex-1"
+          className="h-11 flex-1 accent-poppy"
         />
         <input
           type="number"
           min={0}
           value={item.grams}
           onChange={(e) => onChange({ grams: Math.max(0, Number(e.target.value) || 0) })}
-          className="w-20 rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          className="min-h-11 w-20 rounded-lg border-2 border-toast/40 bg-white px-2 py-1 text-base text-cocoa"
         />
-        <span className="text-sm text-neutral-500">g</span>
+        <span className="text-sm text-toast">g</span>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-3 flex flex-wrap gap-2">
         {COMMON_PORTIONS.map((preset) => (
           <button
             key={preset.label}
             type="button"
             onClick={() => onChange({ grams: preset.grams })}
-            className="rounded-full border border-neutral-300 px-2.5 py-1 text-xs dark:border-neutral-700"
+            className="min-h-11 rounded-full border-2 border-avocado px-3 py-1 text-sm font-semibold text-cocoa"
           >
             {preset.label}
           </button>

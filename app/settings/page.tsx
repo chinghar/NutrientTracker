@@ -4,8 +4,12 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { getSettings, saveSettings, type VisionProviderId } from "@/lib/db/db";
 import { exportAllData, importAllData } from "@/lib/db/export";
 import { AnthropicBrowserProvider } from "@/lib/vision/anthropic-provider";
-import { GeminiBrowserProvider } from "@/lib/vision/gemini-provider";
 import { isOllamaAvailable } from "@/lib/vision/ollama-provider";
+import GeminiKeySetup from "@/components/GeminiKeySetup";
+import Button from "@/components/ui/Button";
+import Rule from "@/components/ui/Rule";
+
+const INPUT_CLASS = "min-h-11 rounded-lg border-2 border-toast/40 bg-white px-3 py-2 text-base text-cocoa";
 
 type TestStatus = { state: "idle" } | { state: "testing" } | { state: "success" } | { state: "error"; message: string };
 type ImportStatus =
@@ -15,13 +19,11 @@ type ImportStatus =
 
 export default function SettingsPage() {
   const [anthropicApiKey, setAnthropicApiKey] = useState("");
-  const [geminiApiKey, setGeminiApiKey] = useState("");
-  const [visionProvider, setVisionProvider] = useState<VisionProviderId>("anthropic");
+  const [visionProvider, setVisionProvider] = useState<VisionProviderId>("gemini");
   const [plateDiameterCm, setPlateDiameterCm] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
   const [anthropicTestStatus, setAnthropicTestStatus] = useState<TestStatus>({ state: "idle" });
-  const [geminiTestStatus, setGeminiTestStatus] = useState<TestStatus>({ state: "idle" });
   const [importStatus, setImportStatus] = useState<ImportStatus>({ state: "idle" });
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -29,7 +31,6 @@ export default function SettingsPage() {
   useEffect(() => {
     getSettings().then((settings) => {
       setAnthropicApiKey(settings.anthropicApiKey ?? "");
-      setGeminiApiKey(settings.geminiApiKey ?? "");
       setVisionProvider(settings.visionProvider);
       setPlateDiameterCm(settings.plateDiameterCm != null ? String(settings.plateDiameterCm) : "");
       setOllamaAvailable(isOllamaAvailable());
@@ -41,7 +42,6 @@ export default function SettingsPage() {
     const parsedDiameter = parseFloat(plateDiameterCm);
     await saveSettings({
       anthropicApiKey: anthropicApiKey || undefined,
-      geminiApiKey: geminiApiKey || undefined,
       visionProvider,
       plateDiameterCm: Number.isFinite(parsedDiameter) && parsedDiameter > 0 ? parsedDiameter : undefined,
     });
@@ -54,13 +54,6 @@ export default function SettingsPage() {
     const provider = new AnthropicBrowserProvider(anthropicApiKey);
     const result = await provider.testKey();
     setAnthropicTestStatus(result.ok ? { state: "success" } : { state: "error", message: result.error });
-  }
-
-  async function handleTestGeminiKey() {
-    setGeminiTestStatus({ state: "testing" });
-    const provider = new GeminiBrowserProvider(geminiApiKey);
-    const result = await provider.testKey();
-    setGeminiTestStatus(result.ok ? { state: "success" } : { state: "error", message: result.error });
   }
 
   async function handleExport() {
@@ -89,47 +82,50 @@ export default function SettingsPage() {
   }
 
   if (!loaded) {
-    return <main className="mx-auto max-w-lg p-6 text-sm text-neutral-500">Loading settings…</main>;
+    return <main className="mx-auto max-w-lg p-6 text-sm text-toast">Loading settings…</main>;
   }
 
   return (
     <main className="mx-auto max-w-lg p-6 space-y-8">
       <div>
-        <h1 className="text-xl font-semibold">Settings</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <h1 className="font-display text-3xl">Settings</h1>
+        <p className="mt-1 text-sm text-toast">
           Your API key is stored only in this browser (IndexedDB) and is sent directly to the provider you choose —
           it never passes through any server.
         </p>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium">Vision provider</h2>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="visionProvider"
-              checked={visionProvider === "anthropic"}
-              onChange={() => setVisionProvider("anthropic")}
-            />
-            Claude (Anthropic API key)
-          </label>
-          <label className="flex items-center gap-2 text-sm">
+        <h2 className="text-sm font-bold">Vision provider</h2>
+        <div className="flex flex-col gap-1">
+          <label className="flex min-h-11 items-center gap-2 text-base">
             <input
               type="radio"
               name="visionProvider"
               checked={visionProvider === "gemini"}
               onChange={() => setVisionProvider("gemini")}
+              className="h-5 w-5"
             />
-            Gemini (free API key)
+            Gemini (free API key, recommended)
+          </label>
+          <label className="flex min-h-11 items-center gap-2 text-base">
+            <input
+              type="radio"
+              name="visionProvider"
+              checked={visionProvider === "anthropic"}
+              onChange={() => setVisionProvider("anthropic")}
+              className="h-5 w-5"
+            />
+            Claude (Anthropic API key)
           </label>
           {ollamaAvailable && (
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex min-h-11 items-center gap-2 text-base">
               <input
                 type="radio"
                 name="visionProvider"
                 checked={visionProvider === "ollama"}
                 onChange={() => setVisionProvider("ollama")}
+                className="h-5 w-5"
               />
               Ollama (local dev only)
             </label>
@@ -137,9 +133,18 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {visionProvider === "gemini" && (
+        <section className="space-y-3">
+          <Rule color="avocado" />
+          <h2 className="text-sm font-bold">Gemini API key</h2>
+          <GeminiKeySetup />
+        </section>
+      )}
+
       {visionProvider === "anthropic" && (
         <section className="space-y-3">
-          <h2 className="text-sm font-medium">Anthropic API key</h2>
+          <Rule color="avocado" />
+          <h2 className="text-sm font-bold">Anthropic API key</h2>
           <input
             type="password"
             autoComplete="off"
@@ -150,67 +155,26 @@ export default function SettingsPage() {
               setAnthropicTestStatus({ state: "idle" });
             }}
             placeholder="sk-ant-..."
-            className="w-full rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            className={`w-full ${INPUT_CLASS}`}
           />
           <div className="flex items-center gap-3">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={handleTestAnthropicKey}
               disabled={!anthropicApiKey || anthropicTestStatus.state === "testing"}
-              className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700"
             >
               {anthropicTestStatus.state === "testing" ? "Testing…" : "Test key"}
-            </button>
-            {anthropicTestStatus.state === "success" && <span className="text-sm text-neutral-500">Key works.</span>}
-            {anthropicTestStatus.state === "error" && (
-              <span className="text-sm text-neutral-500">{anthropicTestStatus.message}</span>
-            )}
-          </div>
-        </section>
-      )}
-
-      {visionProvider === "gemini" && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium">Gemini API key</h2>
-          <p className="text-sm text-neutral-500">
-            Free, no payment required. Get a key at{" "}
-            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="underline">
-              aistudio.google.com
-            </a>
-            .
-          </p>
-          <input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={geminiApiKey}
-            onChange={(e) => {
-              setGeminiApiKey(e.target.value);
-              setGeminiTestStatus({ state: "idle" });
-            }}
-            placeholder="AIza..."
-            className="w-full rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          />
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleTestGeminiKey}
-              disabled={!geminiApiKey || geminiTestStatus.state === "testing"}
-              className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-neutral-700"
-            >
-              {geminiTestStatus.state === "testing" ? "Testing…" : "Test key"}
-            </button>
-            {geminiTestStatus.state === "success" && <span className="text-sm text-neutral-500">Key works.</span>}
-            {geminiTestStatus.state === "error" && (
-              <span className="text-sm text-neutral-500">{geminiTestStatus.message}</span>
-            )}
+            </Button>
+            {anthropicTestStatus.state === "success" && <span className="text-sm font-semibold text-cocoa">Key works.</span>}
+            {anthropicTestStatus.state === "error" && <span className="text-sm text-cocoa">{anthropicTestStatus.message}</span>}
           </div>
         </section>
       )}
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium">Plate size calibration</h2>
-        <p className="text-sm text-neutral-500">
+        <h2 className="text-sm font-bold">Plate size calibration</h2>
+        <p className="text-sm text-toast">
           Your typical plate diameter, passed to the vision model as a scale reference when estimating portions.
         </p>
         <div className="flex items-center gap-2">
@@ -221,51 +185,41 @@ export default function SettingsPage() {
             value={plateDiameterCm}
             onChange={(e) => setPlateDiameterCm(e.target.value)}
             placeholder="27"
-            className="w-24 rounded border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            className={`w-24 ${INPUT_CLASS}`}
           />
-          <span className="text-sm text-neutral-500">cm</span>
+          <span className="text-sm text-toast">cm</span>
         </div>
       </section>
 
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={handleSave}
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-        >
+        <Button type="button" variant="primary" onClick={handleSave}>
           Save
-        </button>
-        {saveStatus === "saved" && <span className="text-sm text-neutral-500">Saved.</span>}
+        </Button>
+        {saveStatus === "saved" && <span className="text-sm font-semibold text-cocoa">Saved.</span>}
       </div>
 
-      <section className="space-y-3 border-t border-neutral-200 pt-6 dark:border-neutral-800">
-        <h2 className="text-sm font-medium">Backup</h2>
-        <p className="text-sm text-neutral-500">
+      <Rule color="poppy" />
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold">Backup</h2>
+        <p className="text-sm text-toast">
           There is no server, so this export is your only backup. It does not include your API keys.
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={handleExport}
-            className="rounded border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
-          >
+          <Button type="button" variant="outline" onClick={handleExport}>
             Export data
-          </button>
-          <button
-            type="button"
-            onClick={() => importInputRef.current?.click()}
-            className="rounded border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
-          >
+          </Button>
+          <Button type="button" variant="outline" onClick={() => importInputRef.current?.click()}>
             Import data
-          </button>
+          </Button>
           <input ref={importInputRef} type="file" accept="application/json" onChange={handleImportFile} className="hidden" />
         </div>
         {importStatus.state === "done" && (
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-cocoa">
             Imported {importStatus.mealCount} meal(s) and {importStatus.weightLogCount} weight log(s).
           </p>
         )}
-        {importStatus.state === "error" && <p className="text-sm text-neutral-500">{importStatus.message}</p>}
+        {importStatus.state === "error" && <p className="text-sm text-cocoa">{importStatus.message}</p>}
       </section>
     </main>
   );

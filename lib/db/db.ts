@@ -10,6 +10,8 @@ export interface Settings {
   anthropicApiKey?: string;
   /** Google AI Studio key — free tier, no payment required. */
   geminiApiKey?: string;
+  /** Which Flash-class model to call; free-tier availability shifts, so this is user-selectable, not hardcoded. */
+  geminiModel?: string;
   visionProvider: VisionProviderId;
   /** Default plate diameter in cm, passed to the vision provider as a scale hint. */
   plateDiameterCm?: number;
@@ -17,7 +19,8 @@ export interface Settings {
   eatingDisorderCardShown?: boolean;
 }
 
-const DEFAULT_SETTINGS: Settings = { id: "app", visionProvider: "anthropic" };
+/** Gemini is the default: it's the only provider with a genuinely free tier. */
+const DEFAULT_SETTINGS: Settings = { id: "app", visionProvider: "gemini" };
 
 /** Where a logged item's food data came from. */
 export type MealItemSource = "usda" | "openfoodfacts" | "manual";
