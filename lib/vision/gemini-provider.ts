@@ -3,8 +3,15 @@ import { buildMealAnalysisPrompt } from "./prompt";
 import { parseMealAnalysis, VisionAnalysisError, type MealAnalysis, type VisionProvider } from "./types";
 
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-/** Flash tier: fast, multimodal, and covered by Google AI Studio's free tier. */
-const DEFAULT_MODEL = "gemini-3.7-flash";
+/**
+ * Flash tier: fast, multimodal, and covered by Google AI Studio's free tier.
+ * Deliberately not the newest-tier model (3.7/3.8) — those can return
+ * "caller does not have permission" for keys/projects that haven't been
+ * granted access to the bleeding-edge tier yet. 3.5 is Google's own
+ * recommended migration target off the older 2.x models and is broadly
+ * available.
+ */
+const DEFAULT_MODEL = "gemini-3.5-flash";
 
 interface GeminiPart {
   text?: string;
