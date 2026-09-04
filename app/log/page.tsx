@@ -173,6 +173,14 @@ export default function LogPage() {
     setStatusMessage("Meal logged again.");
   }
 
+  async function handleDeleteMeal(meal: LoggedMeal) {
+    if (meal.id == null) return;
+    if (!confirm("Remove this meal from your log?")) return;
+    await db.mealLogs.delete(meal.id);
+    await refreshRecentMeals();
+    setStatusMessage("Meal removed.");
+  }
+
   function resetToHome() {
     setItems([]);
     setError(null);
@@ -239,9 +247,20 @@ export default function LogPage() {
                       <p className="text-base text-cocoa">{meal.items.map((i) => i.name).join(", ")}</p>
                       <p className="text-xs text-toast">{new Date(meal.loggedAt).toLocaleString()}</p>
                     </div>
-                    <Button type="button" variant="outline" onClick={() => handleLogAgain(meal)} className="shrink-0 text-xs">
-                      Log again
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <Button type="button" variant="outline" onClick={() => handleLogAgain(meal)} className="text-xs">
+                        Log again
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => handleDeleteMeal(meal)}
+                        className="text-xs text-poppy"
+                        aria-label={`Remove ${meal.items.map((i) => i.name).join(", ")} from log`}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
